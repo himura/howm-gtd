@@ -26,6 +26,7 @@
 
 (require 'howm)
 (require 'action-lock)
+(require 'cl)
 
 (eval-after-load "action-lock"
   '(progn
@@ -50,45 +51,53 @@
            (cheat-font-lock-fontify t)
            )))))
 
-(defvar howm-gtd-face-alist
-      '(("INBOX" . howm-gtd-face-inbox)
-        ("REVIEW" . howm-gtd-face-misc)
-        ("SOMEDAY" . howm-gtd-face-misc)
-        ("PROJECT" . howm-gtd-face-misc)
-        ("WAIT" . howm-gtd-face-misc)
-        ("NEXT" . howm-gtd-face-next)
-        ("CANCEL" . howm-gtd-face-done)
-        ("DONE" . howm-gtd-face-done))
-      "")
-
-(defvar howm-gtd-type-list '("NEXT" "INBOX" "REVIEW" "SOMEDAY" "PROJECT" "WAIT")
-  "")
-
-(defvar howm-gtd-type-list-all '("NEXT" "INBOX" "REVIEW" "SOMEDAY" "PROJECT" "WAIT" "CANCEL" "DONE")
+(defvar howm-gtd-type-spec
+  '(("NEXT"    (:face howm-gtd-face-next :keys (?n) :order 0))
+    ("INBOX"   (:face howm-gtd-face-inbox :keys (?i) :order -1))
+    ("WAIT"    (:face howm-gtd-face-misc :keys (?w) :order -2))
+    ("PROJECT" (:face howm-gtd-face-misc :keys (?p) :order -3))
+    ("SOMEDAY" (:face howm-gtd-face-misc :keys (?s) :order -4))
+    ("REVIEW"  (:face howm-gtd-face-misc :keys (?r) :order -5))
+    ("CANCEL"  (:face howm-gtd-face-done :keys (?c ?x) :order nil))
+    ("DONE"    (:face howm-gtd-face-done :keys (?d ?\n) :order nil)))
   "")
 
 (defvar howm-gtd-default-type "DONE"
   "")
 
-(defvar howm-gtd-todo-item-order-assoc
-      '(("NEXT" . 0)
-        ("INBOX" . -1)
-        ("WAIT" . -2)
-        ("PROJECT" . -3)
-        ("REVIEW" . -4)
-        ("SOMEDAY" . -5))
-      "")
+(defvar howm-gtd-key-alist nil "")
 
-(defvar howm-gtd-key-alist
-  '((?i . "INBOX")
-    (?r . "REVIEW")
-    (?s . "SOMEDAY")
-    (?p . "PROJECT")
-    (?w . "WAIT")
-    (?n . "NEXT")
-    (?c . "CANCEL")
-    (?d . "DONE"))
-"")
+(defun howm-gtd-all-types ()
+  ""
+  (mapcar #'car howm-gtd-type-spec))
+
+(defvar howm-gtd-activated-type-regexp-cache nil "")
+(defun howm-gtd-activated-type-regexp (&optional reset)
+  (if (and howm-gtd-activated-type-regexp-cache (not reset))
+      howm-gtd-activated-type-regexp-cache
+    (setq howm-gtd-activated-type-regexp-cache
+          (regexp-opt
+           (delq nil
+                 (mapcar (lambda (x) (if (howm-gtd-get-parameter x :order) x nil))
+                         (howm-gtd-all-types)))
+           t))
+    howm-gtd-activated-type-regexp-cache))
+
+(defun howm-gtd-get-parameter (type key)
+  ""
+  (cadr (member key (cadr (assoc type howm-gtd-type-spec)))))
+
+(defun howm-gtd-menu-key-list (&optional reset)
+  ""
+  (if (and howm-gtd-key-alist (not reset))
+      howm-gtd-key-alist
+    (setq howm-gtd-key-alist nil)
+    (loop for type in (howm-gtd-all-types)
+          do (let ((keys (howm-gtd-get-parameter type :keys)))
+               (setq howm-gtd-key-alist
+                     (append (mapcar (lambda (k) (cons k type)) keys)
+                             howm-gtd-key-alist))))
+    howm-gtd-key-alist))                ;
 
 (defface howm-gtd-face-misc
   '((t
@@ -120,7 +129,7 @@
                       (s (match-string-no-properties 3))
                       (tag (match-string-no-properties 2))
                       (tag (if tag tag action-lock-switch-time-default-tag))
-                      (next (or (action-lock-item-menu howm-gtd-key-alist) howm-gtd-default-type)))
+                      (next (or (action-lock-item-menu (howm-gtd-menu-key-list)) howm-gtd-default-type)))
                  (delete-region b e)
                  (insert (format-time-string (concat ,time-format tag)) " " next)
                  (goto-char b)))
@@ -129,7 +138,7 @@
 
 (defun action-lock-get-gtd-type (kwd)
   (if (numberp kwd) (setq kwd (match-string kwd)))
-  (or (cdr (assoc kwd howm-gtd-face-alist)) 'gtd-face-misc))
+  (or (howm-gtd-get-parameter kwd :face) 'gtd-face-misc))
 
 (defun action-lock-item-menu (itemlist)
   (interactive "P")
@@ -139,11 +148,11 @@
     (cdr (assoc c itemlist))))
 
 (setq action-lock-default-rules
-       (cons (action-lock-switch-time howm-gtd-type-list-all)
+       (cons (action-lock-switch-time (howm-gtd-all-types))
              action-lock-default-rules))
 
 (defun howm-gtd-menu-all ()
-  (let* ((types (concat "[+]? " (regexp-opt howm-gtd-type-list t)))
+  (let* ((types (concat "[+]? " (howm-gtd-activated-type-regexp)))
          (r (howm-reminder-regexp types))
          (rg (howm-reminder-regexp-grep types))
          (summarizer (howm-reminder-summarizer r))
@@ -154,7 +163,7 @@
 (setq howm-menu-allow (cons 'howm-gtd-menu-all howm-menu-allow))
 
 (defun howm-gtd-get-type (str)
-  (let* ((rx (regexp-opt howm-gtd-type-list t)))
+  (let* ((rx (regexp-opt (howm-gtd-all-types) t)))
     (if (string-match rx str)
         (match-string 1 str)
       nil)))
@@ -172,8 +181,8 @@
     (cons type priority)))
 
 (defun howm-gtd-priority-gt (e1 e2)
-  (let ((e1t (cdr (assoc (car e1) howm-gtd-todo-item-order-assoc))) ; FIXME
-        (e2t (cdr (assoc (car e2) howm-gtd-todo-item-order-assoc))))
+  (let ((e1t (howm-gtd-get-parameter (car e1) :order)) ; FIXME
+        (e2t (howm-gtd-get-parameter (car e2) :order)))
     (if (and e1t e2t)
         (cond ((> e1t e2t) t)
               ((< e1t e2t) nil)
