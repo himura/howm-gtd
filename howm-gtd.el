@@ -65,39 +65,25 @@
 (defvar howm-gtd-default-type "DONE"
   "")
 
-(defvar howm-gtd-key-alist nil "")
-
-(defun howm-gtd-all-types ()
-  ""
+(howm-defun-memoize howm-gtd-all-types ()
   (mapcar #'car howm-gtd-type-spec))
 
-(defvar howm-gtd-activated-type-regexp-cache nil "")
-(defun howm-gtd-activated-type-regexp (&optional reset)
-  (if (and howm-gtd-activated-type-regexp-cache (not reset))
-      howm-gtd-activated-type-regexp-cache
-    (setq howm-gtd-activated-type-regexp-cache
-          (regexp-opt
-           (delq nil
-                 (mapcar (lambda (x) (if (howm-gtd-get-parameter x :order) x nil))
-                         (howm-gtd-all-types)))
-           t))
-    howm-gtd-activated-type-regexp-cache))
+(howm-defun-memoize howm-gtd-activated-type-regexp ()
+  (regexp-opt
+   (delq nil
+         (mapcar (lambda (x) (if (howm-gtd-get-parameter x :order) x nil))
+                 (howm-gtd-all-types)))
+   t))
 
-(defun howm-gtd-get-parameter (type key)
-  ""
+(howm-defun-memoize howm-gtd-get-parameter (type key)
   (cadr (member key (cadr (assoc type howm-gtd-type-spec)))))
 
-(defun howm-gtd-menu-key-list (&optional reset)
-  ""
-  (if (and howm-gtd-key-alist (not reset))
-      howm-gtd-key-alist
-    (setq howm-gtd-key-alist nil)
-    (loop for type in (howm-gtd-all-types)
-          do (let ((keys (howm-gtd-get-parameter type :keys)))
-               (setq howm-gtd-key-alist
-                     (append (mapcar (lambda (k) (cons k type)) keys)
-                             howm-gtd-key-alist))))
-    howm-gtd-key-alist))                ;
+(howm-defun-memoize howm-gtd-menu-key-list ()
+  (apply 'append
+         (mapcar (lambda (type)
+                   (mapcar (lambda (k) (cons k type))
+                           (howm-gtd-get-parameter type :keys)))
+                 (howm-gtd-all-types))))
 
 (defface howm-gtd-face-misc
   '((t
