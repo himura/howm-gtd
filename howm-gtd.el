@@ -65,6 +65,9 @@
 (defvar howm-gtd-default-type "DONE"
   "")
 
+(defvar action-lock-switch-time-default-tag ""
+  "")
+
 (howm-defun-memoize howm-gtd-all-types ()
   (mapcar #'car howm-gtd-type-spec))
 
@@ -113,14 +116,12 @@
                (let* ((b (match-beginning 0))
                       (e (match-end 0))
                       (s (match-string-no-properties 3))
-                      (tag (match-string-no-properties 2))
-                      (tag (if tag tag action-lock-switch-time-default-tag))
+                      (tag (or (match-string-no-properties 2) action-lock-switch-time-default-tag))
                       (next (or (action-lock-item-menu (howm-gtd-menu-key-list)) howm-gtd-default-type)))
                  (delete-region b e)
                  (insert (format-time-string (concat ,time-format tag)) " " next)
                  (goto-char b)))
             3 nil #'(action-lock-get-gtd-type 3)))))
-(setq action-lock-switch-time-default-tag "")
 
 (defun action-lock-get-gtd-type (kwd)
   (if (numberp kwd) (setq kwd (match-string kwd)))
