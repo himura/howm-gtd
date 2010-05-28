@@ -59,7 +59,7 @@
     ("SOMEDAY" (:face howm-gtd-face-misc :keys (?s) :order -4))
     ("REVIEW"  (:face howm-gtd-face-misc :keys (?r) :order -5))
     ("CANCEL"  (:face howm-gtd-face-done :keys (?c ?x) :order nil))
-    ("DONE"    (:face howm-gtd-face-done :keys (?d ?\n) :order nil)))
+    ("DONE"    (:face howm-gtd-face-done :keys (?d) :order nil)))
   "")
 
 (defvar howm-gtd-default-type "DONE"
