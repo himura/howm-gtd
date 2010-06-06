@@ -105,29 +105,34 @@
      (:foreground "gray" :weight bold)))
   "howm howm-gtd done face")
 
-(defun action-lock-switch-time (label-list)
-  (let ((time-format "[%Y-%m-%d %H:%M]")
-        (time-regexp (let ((dd "[0-9]\\{2\\}"))
-                       (format "\\(\\[%s%s-%s-%s %s:%s\\]\\(.*\\) \\)?"
-                               dd dd dd dd dd dd))))
-    (let ((regexp (concat time-regexp (regexp-opt label-list t))))
-      (list regexp
-            `(lambda (&optional dummy)
+(defun howm-gtd-create-action-lock-regexp (label-list)
+  (let
+      ((time-regexp (let ((dd "[0-9]\\{2\\}"))
+                      (format "\\(\\[%s%s-%s-%s %s:%s\\]\\(.*\\) \\)?"
+                              dd dd dd dd dd dd))))
+    (concat time-regexp (regexp-opt label-list t))))
+
+(defun howm-gtd-create-action-lock (label-list)
+  (let ((time-format "[%Y-%m-%d %H:%M]"))
+    (list (howm-gtd-create-action-lock-regexp label-list)
+          `(lambda (&optional dummy)
+             (if (eq major-mode 'howm-menu-mode)
+                 (howm-action-lock-forward (match-beginning 0))
                (let* ((b (match-beginning 0))
                       (e (match-end 0))
                       (s (match-string-no-properties 3))
                       (tag (or (match-string-no-properties 2) action-lock-switch-time-default-tag))
-                      (next (or (action-lock-item-menu (howm-gtd-menu-key-list)) howm-gtd-default-type)))
+                      (next (or (howm-gtd-item-menu (howm-gtd-menu-key-list)) howm-gtd-default-type)))
                  (delete-region b e)
                  (insert (format-time-string (concat ,time-format tag)) " " next)
-                 (goto-char b)))
-            3 nil #'(action-lock-get-gtd-type 3)))))
+                 (goto-char b))))
+          3 nil #'(howm-gtd-action-lock-face 3))))
 
-(defun action-lock-get-gtd-type (kwd)
+(defun howm-gtd-action-lock-face (kwd)
   (if (numberp kwd) (setq kwd (match-string kwd)))
   (or (howm-gtd-get-parameter kwd :face) 'gtd-face-misc))
 
-(defun action-lock-item-menu (itemlist)
+(defun howm-gtd-item-menu (itemlist)
   (interactive "P")
   (message (mapconcat (lambda (item) (format "(%c)%s" (car item) (cdr item))) itemlist ", "))
   (let* ((sw (selected-window)) (c (read-char)))
@@ -135,8 +140,8 @@
     (cdr (assoc c itemlist))))
 
 (setq action-lock-default-rules
-       (cons (action-lock-switch-time (howm-gtd-all-types))
-             action-lock-default-rules))
+      (cons (howm-gtd-create-action-lock (howm-gtd-all-types))
+            action-lock-default-rules))
 
 (defun howm-gtd-menu-all ()
   (let* ((types (concat "[+]? " (howm-gtd-activated-type-regexp)))
